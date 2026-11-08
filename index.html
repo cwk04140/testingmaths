@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加法動作互動練習</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8/dist/teachablemachine-pose.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F3F4F6;
+            touch-action: manipulation;
+        }
+        .huge-text {
+            font-size: 5rem;
+            line-height: 1.2;
+        }
+        .emoji-text {
+            font-size: 4rem;
+            letter-spacing: 0.5rem;
+        }
+        #webcam-container canvas {
+            border-radius: 1rem;
+            border: 4px solid #3B82F6;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+        .hidden-screen {
+            display: none !important;
+        }
+        .highlight-option {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px 5px rgba(250, 204, 21, 0.8);
+            transition: all 0.3s ease;
+        }
+        /* Modal 背景 */
+        .modal-bg {
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 relative">
+
+    <!-- 頂部設定按鈕 (Google Sheet 連線) -->
+    <button onclick="openSettings()" class="absolute top-6 right-6 bg-gray-200 hover:bg-gray-300 text-gray-700 p-3 rounded-full shadow transition-colors z-10 text-2xl" title="設定 Google Sheet">
+        ⚙️
+    </button>
+
+    <!-- 1. 開始畫面 -->
+    <div id="start-screen" class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-10 text-center flex flex-col items-center justify-center">
+        <h1 class="text-6xl font-bold text-blue-700 mb-8">數學加法練習</h1>
+        <p class="text-3xl text-gray-700 mb-8">請準備好視訊鏡頭<br><br>做動作 1 選擇左邊 (A)<br>做動作 2 選擇右邊 (B)</p>
+        
+        <!-- 學生代號輸入區 -->
+        <div class="mb-8 bg-blue-50 p-6 rounded-2xl w-full max-w-md">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">輸入學生代號 (3-4個數字)</h2>
+            <input type="text" id="student-id-input" inputmode="none" class="w-full text-center text-5xl font-bold p-4 rounded-xl border-4 border-blue-300 mb-4 focus:outline-none focus:border-blue-500 bg-white tracking-widest text-blue-800" placeholder="---" readonly>
+            
+            <!-- 螢幕數字鍵盤 -->
+            <div class="grid grid-cols-3 gap-3">
+                <button onclick="inputDigit('1')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">1</button>
+                <button onclick="inputDigit('2')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">2</button>
+                <button onclick="inputDigit('3')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">3</button>
+                <button onclick="inputDigit('4')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">4</button>
+                <button onclick="inputDigit('5')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">5</button>
+                <button onclick="inputDigit('6')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">6</button>
+                <button onclick="inputDigit('7')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">7</button>
+                <button onclick="inputDigit('8')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">8</button>
+                <button onclick="inputDigit('9')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">9</button>
+                <button onclick="clearDigit()" class="bg-red-100 text-red-700 text-2xl font-bold py-4 rounded-lg shadow border-2 border-red-300 hover:bg-red-200 active:bg-red-300 transition-colors">清除</button>
+                <button onclick="inputDigit('0')" class="bg-white text-3xl font-bold py-4 rounded-lg shadow border-2 border-gray-200 hover:bg-gray-100 active:bg-gray-200 transition-colors">0</button>
+                <button onclick="deleteDigit()" class="bg-yellow-100 text-yellow-800 text-2xl font-bold py-4 rounded-lg shadow border-2 border-yellow-300 hover:bg-yellow-200 active:bg-yellow-300 transition-colors">退格</button>
+            </div>
+        </div>
+
+        <button id="start-btn" onclick="initGame()" class="bg-green-500 hover:bg-green-600 text-white text-5xl font-bold py-6 px-16 rounded-full shadow-lg transition-transform transform hover:scale-105">
+            開始練習
+        </button>
+        
+        <!-- 新增：查看歷史進步報告按鈕 -->
+        <button onclick="showProgressReport()" class="mt-6 bg-purple-500 hover:bg-purple-600 text-white text-3xl font-bold py-4 px-12 rounded-full shadow-lg transition-transform transform hover:scale-105">
+            📊 學生進度報告
+        </button>
+
+        <div id="loading-text" class="hidden text-2xl text-blue-600 mt-6 font-bold animate-pulse">
+            正在載入模型與相機，請稍候...
+        </div>
+        <div id="error-message" class="hidden text-xl text-red-600 mt-6 font-bold bg-red-100 p-4 rounded-xl">
+        </div>
+    </div>
+
+    <!-- 2. 遊戲畫面 -->
+    <div id="game-screen" class="w-full max-w-5xl hidden-screen flex flex-col items-center">
+        
+        <!-- 進度與視訊區 -->
+        <div class="w-full flex justify-between items-center mb-6 px-4">
+            <div class="text-4xl font-bold text-gray-700">第 <span id="question-count">1</span> / 5 題</div>
+            <div id="webcam-container"></div>
+        </div>
+
+        <!-- 題目區 -->
+        <div class="w-full bg-white rounded-3xl shadow-xl p-8 mb-8 text-center border-8 border-blue-200">
+            <div id="question-text" class="huge-text font-bold text-gray-800 mb-2">1 + 2 = ?</div>
+            <div id="question-emojis" class="emoji-text text-center">🍎 + 🍎🍎 = ?</div>
+        </div>
+
+        <!-- 選項區 -->
+        <div class="w-full flex justify-between gap-8">
+            <!-- 選項 A (Class 1) -->
+            <div id="option-A" onclick="triggerAnswer('A')" class="cursor-pointer flex-1 bg-yellow-100 border-8 border-yellow-400 rounded-3xl p-10 text-center shadow-lg transition-all relative overflow-hidden hover:bg-yellow-200">
+                <div class="text-4xl font-bold text-yellow-700 mb-4">動作 1 (左)</div>
+                <div id="ans-A-text" class="huge-text font-bold text-black mb-4">3</div>
+                <div class="text-2xl font-bold text-gray-500 mb-2">辨識度: <span id="prob-A-text">0%</span></div>
+                <div class="w-full bg-yellow-200 h-6 rounded-full overflow-hidden">
+                    <div id="prob-A-bar" class="bg-yellow-500 h-full w-0 transition-all duration-100"></div>
+                </div>
+                <div class="absolute bottom-0 left-0 h-6 bg-blue-500 w-0 transition-all duration-100" id="hold-A-bar"></div>
+            </div>
+            
+            <!-- 選項 B (Class 2) -->
+            <div id="option-B" onclick="triggerAnswer('B')" class="cursor-pointer flex-1 bg-green-100 border-8 border-green-400 rounded-3xl p-10 text-center shadow-lg transition-all relative overflow-hidden hover:bg-green-200">
+                <div class="text-4xl font-bold text-green-700 mb-4">動作 2 (右)</div>
+                <div id="ans-B-text" class="huge-text font-bold text-black mb-4">4</div>
+                <div class="text-2xl font-bold text-gray-500 mb-2">辨識度: <span id="prob-B-text">0%</span></div>
+                <div class="w-full bg-green-200 h-6 rounded-full overflow-hidden">
+                    <div id="prob-B-bar" class="bg-green-500 h-full w-0 transition-all duration-100"></div>
+                </div>
+                <div class="absolute bottom-0 left-0 h-6 bg-blue-500 w-0 transition-all duration-100" id="hold-B-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 回饋畫面 -->
+    <div id="feedback-screen" class="fixed inset-0 bg-black bg-opacity-80 z-50 hidden-screen flex flex-col items-center justify-center">
+        <div id="feedback-icon" class="text-[15rem] mb-4">✅</div>
+        <div id="feedback-text" class="text-8xl font-bold text-white tracking-wider">好叻！</div>
+    </div>
+
+    <!-- 4. 結算畫面 -->
+    <div id="end-screen" class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-10 text-center hidden-screen flex flex-col items-center">
+        <h1 class="text-6xl font-bold text-blue-700 mb-6">練習完成！</h1>
+        <div id="final-score" class="text-5xl font-bold text-gray-800 mb-4">答對：4 / 5 題</div>
+        <div id="final-comment" class="text-5xl text-orange-500 font-bold mb-8">表現出色！</div>
+        
+        <!-- AI 專家綜合分析區塊 -->
+        <div class="w-full bg-gradient-to-r from-blue-50 to-indigo-100 p-8 rounded-3xl mb-8 text-left border-4 border-indigo-300 shadow-inner">
+            <h3 class="text-3xl font-bold text-indigo-800 mb-4 flex items-center justify-between">
+                <span>🤖 AI 專家綜合評估：</span>
+                <button onclick="copyGeminiPrompt()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold py-2 px-4 rounded-xl shadow transition-transform transform hover:scale-105">
+                    📋 複製 Gemini Prompt
+                </button>
+            </h3>
+            <p id="ai-analysis" class="text-2xl text-gray-700 leading-relaxed animate-pulse">
+                正在彙整作答數據並生成專屬教學報告，請稍候...
+            </p>
+        </div>
+        
+        <div id="upload-status" class="hidden text-xl font-bold text-green-600 mb-4 bg-green-100 p-3 rounded-lg w-full text-center">
+            ✅ 成績與分析已自動上傳至 Google Sheet
+        </div>
+
+        <div class="flex gap-6">
+            <button onclick="downloadCSV()" class="bg-blue-500 hover:bg-blue-600 text-white text-4xl font-bold py-5 px-10 rounded-full shadow-lg">
+                📥 下載成績表
+            </button>
+            <button onclick="location.reload()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 text-4xl font-bold py-5 px-10 rounded-full shadow-lg">
+                🔄 再玩一次
+            </button>
+        </div>
+    </div>
+
+    <!-- 5. 設定 Modal (Google Sheet & Gemini API Key) -->
+    <div id="settings-modal" class="fixed inset-0 modal-bg z-50 hidden-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">⚙️ 系統設定</h2>
+            
+            <label class="block text-gray-700 font-bold mb-2">Google Apps Script Web App 網址：</label>
+            <textarea id="webhook-input" rows="2" class="w-full p-3 border-2 border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-blue-500 text-sm" placeholder="https://script.google.com/macros/s/.../exec"></textarea>
+
+            <label class="block text-gray-700 font-bold mb-2">Gemini API Key：</label>
+            <input type="password" id="gemini-key-input" class="w-full p-3 border-2 border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-blue-500 text-sm" placeholder="AIzaSy... 或 AQ...">
+            
+            <div id="settings-msg" class="text-green-600 font-bold mb-4 hidden">設定已儲存！</div>
+            
+            <div class="flex justify-end gap-4">
+                <button onclick="closeSettings()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300">取消</button>
+                <button onclick="saveSettings()" class="px-6 py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增：歷史進步報告 Modal -->
+    <div id="progress-modal" class="fixed inset-0 modal-bg z-50 hidden-screen flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <h2 class="text-4xl font-bold text-purple-800 mb-6 flex justify-between items-center border-b-4 border-purple-200 pb-4">
+                <span>📈 學生進度報告 <span id="progress-student-id" class="text-orange-500"></span></span>
+                <button onclick="closeProgressReport()" class="text-gray-500 hover:text-gray-800 text-5xl font-bold">&times;</button>
+            </h2>
+            <div id="progress-content" class="flex-1 overflow-y-auto text-2xl text-gray-700 leading-relaxed bg-purple-50 p-6 rounded-2xl">
+                <!-- AI 報告內容會顯示在這裡 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 設定模型網址 ---
+        const URL = "https://teachablemachine.withgoogle.com/models/8woH0t376/";
+        let model, webcam, maxPredictions, ctx, canvas;
+
+        // --- 遊戲狀態 ---
+        let currentQuestion = 1;
+        const totalQuestions = 5;
+        let score = 0;
+        let isPredicting = false;
+        
+        let num1 = 0, num2 = 0, correctAnswer = 0, correctOption = 'A';
+        let studentID = "";
+        let geminiAnalysisText = ""; 
+        let records = []; 
+        let questionStartTime = 0;
+        let holdStartTime = 0;
+        let holdingClass = -1;
+        let motorStruggleFrames = 0; 
+        let hasMotorStruggle = false; 
+        let aiQuestions = []; 
+        let fetchedHistoryData = []; 
+
+        // --- Google Sheet & Gemini Key ---
+        let webhookUrl = localStorage.getItem('googleSheetWebhook') || "";
+        let geminiApiKey = localStorage.getItem('geminiApiKey') || "";
+
+        // --- 設定 Modal 邏輯 ---
+        function openSettings() {
+            document.getElementById('webhook-input').value = webhookUrl;
+            document.getElementById('gemini-key-input').value = geminiApiKey;
+            document.getElementById('settings-msg').classList.add('hidden');
+            document.getElementById('settings-modal').classList.remove('hidden-screen');
+        }
+        function closeSettings() {
+            document.getElementById('settings-modal').classList.add('hidden-screen');
+        }
+        function saveSettings() {
+            webhookUrl = document.getElementById('webhook-input').value.trim();
+            geminiApiKey = document.getElementById('gemini-key-input').value.trim();
+            localStorage.setItem('googleSheetWebhook', webhookUrl);
+            localStorage.setItem('geminiApiKey', geminiApiKey);
+            document.getElementById('settings-msg').classList.remove('hidden');
+            setTimeout(closeSettings, 1000);
+        }
+
+        // --- 鍵盤與數字輸入邏輯 ---
+        function inputDigit(num) {
+            let inputField = document.getElementById('student-id-input');
+            if (inputField.value.length < 4) inputField.value += num;
+        }
+        function deleteDigit() {
+            let inputField = document.getElementById('student-id-input');
+            inputField.value = inputField.value.slice(0, -1);
+        }
+        function clearDigit() {
+            document.getElementById('student-id-input').value = "";
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (!document.getElementById('start-screen').classList.contains('hidden-screen') && 
+                document.getElementById('settings-modal').classList.contains('hidden-screen')) {
+                if (e.key >= '0' && e.key <= '9') inputDigit(e.key);
+                else if (e.key === 'Backspace') deleteDigit();
+                else if (e.key === 'Enter') initGame();
+            }
+        });
+
+        // --- 初始化遊戲 ---
+        async function initGame() {
+            studentID = document.getElementById('student-id-input').value;
+            if (!studentID) {
+                document.getElementById('error-message').innerText = "請輸入學生代號！";
+                document.getElementById('error-message').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('start-btn').classList.add('hidden');
+            const loadingText = document.getElementById('loading-text');
+            loadingText.innerText = "🤖 AI 專家正在為學生設計專屬題目...";
+            loadingText.classList.remove('hidden');
+            document.getElementById('error-message').classList.add('hidden');
+
+            // 1. 若有填寫 API Key 則請 AI 產生題目，否則自動退回預設題目
+            if (geminiApiKey) {
+                await generateAIQuestions(studentID);
+            } else {
+                generateFallbackQuestions();
+            }
+
+            loadingText.innerText = "正在載入模型與相機，請稍候...";
+
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            try {
+                model = await tmPose.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+            } catch (error) {
+                console.warn("模型載入受阻");
+            }
+
+            try {
+                const size = 320;
+                webcam = new tmPose.Webcam(size, size, true); 
+                await webcam.setup();
+                await webcam.play();
+                window.requestAnimationFrame(loop);
+
+                canvas = document.createElement("canvas");
+                canvas.width = size; canvas.height = size;
+                ctx = canvas.getContext("2d");
+                document.getElementById("webcam-container").innerHTML = "";
+                document.getElementById("webcam-container").appendChild(canvas);
+            } catch (error) {
+                document.getElementById("webcam-container").innerHTML = '<div class="w-[320px] h-[320px] bg-gray-200 flex items-center justify-center rounded-2xl border-4 border-gray-400 text-gray-500 font-bold p-4 text-center text-xl">相機無法使用<br><br>請直接點擊選項作答</div>';
+            }
+
+            document.getElementById('start-screen').classList.add('hidden-screen');
+            document.getElementById('game-screen').classList.remove('hidden-screen');
+            generateQuestion();
+        }
+
+        function generateFallbackQuestions() {
+            aiQuestions = [];
+            for(let i = 0; i < 5; i++) {
+                aiQuestions.push({
+                    n1: Math.floor(Math.random() * 5) + 1,
+                    n2: Math.floor(Math.random() * 5) + 1
+                });
+            }
+        }
+
+        // --- 根據歷史資料由 AI 動態設計題目 ---
+        async function generateAIQuestions(studentID) {
+            let historyText = "無歷史紀錄。";
+            if (webhookUrl) {
+                try {
+                    const response = await fetch(webhookUrl, { method: 'GET', redirect: 'follow' });
+                    const data = await response.json();
+                    const history = data.filter(row => String(row[1]) === String(studentID));
+                    if (history.length > 0) {
+                        historyText = history.slice(-3).map((row, i) => `測驗${i+1}: 分數 ${row[2]}`).join("\n");
+                    }
+                } catch(e) {}
+            }
+
+            const prompt = `你是一位香港的特殊教育專家。請根據嚴重智障初中生（代號：${studentID}）的歷史紀錄，為他量身訂做 5 題加法練習。
+歷史紀錄：
+${historyText}
+
+設計規則：
+1. 數字 (n1 與 n2) 必須在 1 到 5 之間（例如 1+1, 2+3）。
+2. 請以 JSON 陣列格式回傳 5 個物件：[{"n1": 1, "n2": 2}, ...]`;
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                clearTimeout(timeoutId);
+                const result = await response.json();
+                const aiData = JSON.parse(result.candidates[0].content.parts[0].text);
+                
+                if (Array.isArray(aiData) && aiData.length >= 5) {
+                    aiQuestions = aiData.slice(0, 5).map(q => ({ 
+                        n1: Math.min(Math.max(q.n1, 1), 5),
+                        n2: Math.min(Math.max(q.n2, 1), 5)
+                    }));
+                } else {
+                    generateFallbackQuestions();
+                }
+            } catch (error) {
+                clearTimeout(timeoutId);
+                generateFallbackQuestions();
+            }
+        }
+
+        // --- 預測迴圈 ---
+        async function loop() {
+            try {
+                if (webcam && webcam.canvas) webcam.update();
+                if (isPredicting) await predict();
+            } catch (error) {}
+            finally { window.requestAnimationFrame(loop); }
+        }
+
+        // --- 產生新題目 ---
+        function generateQuestion() {
+            document.getElementById('question-count').innerText = currentQuestion;
+            
+            const currentQ = aiQuestions.shift() || { 
+                n1: Math.floor(Math.random() * 5) + 1, 
+                n2: Math.floor(Math.random() * 5) + 1 
+            };
+            
+            num1 = currentQ.n1;
+            num2 = currentQ.n2;
+            correctAnswer = num1 + num2;
+            
+            let wrongAnswer = correctAnswer + (Math.random() > 0.5 ? 1 : -1);
+            if (wrongAnswer <= 0) wrongAnswer = correctAnswer + 1;
+
+            document.getElementById('question-text').innerText = `${num1} + ${num2} = ?`;
+            document.getElementById('question-emojis').innerText = `${'🍎'.repeat(num1)} + ${'🍎'.repeat(num2)} = ?`;
+
+            correctOption = Math.random() > 0.5 ? 'A' : 'B';
+            document.getElementById('ans-A-text').innerText = correctOption === 'A' ? correctAnswer : wrongAnswer;
+            document.getElementById('ans-B-text').innerText = correctOption === 'B' ? correctAnswer : wrongAnswer;
+
+            document.getElementById('prob-A-bar').style.width = '0%';
+            document.getElementById('prob-B-bar').style.width = '0%';
+            document.getElementById('hold-A-bar').style.width = '0%';
+            document.getElementById('hold-B-bar').style.width = '0%';
+            
+            questionStartTime = Date.now();
+            isPredicting = true;
+        }
+
+        // --- 核心預測與骨架描繪 ---
+        async function predict() {
+            if (!isPredicting || !model || !webcam.canvas) return;
+
+            const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
+            const prediction = await model.predict(posenetOutput);
+            
+            let probA = prediction[0] ? prediction[0].probability : 0;
+            let probB = prediction[1] ? prediction[1].probability : 0;
+
+            const isPersonDetected = pose && pose.score > 0.2;
+            if (!isPersonDetected) { probA = 0; probB = 0; }
+
+            document.getElementById('prob-A-text').innerText = Math.round(probA * 100) + '%';
+            document.getElementById('prob-A-bar').style.width = Math.round(probA * 100) + '%';
+            document.getElementById('prob-B-text').innerText = Math.round(probB * 100) + '%';
+            document.getElementById('prob-B-bar').style.width = Math.round(probB * 100) + '%';
+
+            let currentDominantClass = -1;
+            if (probA > 0.85) currentDominantClass = 0;
+            else if (probB > 0.85) currentDominantClass = 1;
+
+            if ((probA > 0.3 && probA <= 0.85) || (probB > 0.3 && probB <= 0.85)) {
+                motorStruggleFrames++;
+                if (motorStruggleFrames > 20) {
+                    hasMotorStruggle = true;
+                }
+            } else {
+                motorStruggleFrames = 0;
+            }
+
+            if (currentDominantClass !== -1) {
+                if (holdingClass !== currentDominantClass) {
+                    holdingClass = currentDominantClass;
+                    holdStartTime = Date.now();
+                } else {
+                    const holdTime = Date.now() - holdStartTime;
+                    const progress = Math.min((holdTime / 1500) * 100, 100); 
+                    
+                    if (currentDominantClass === 0) {
+                        document.getElementById('option-A').classList.add('highlight-option');
+                        document.getElementById('hold-A-bar').style.width = progress + '%';
+                    } else {
+                        document.getElementById('option-B').classList.add('highlight-option');
+                        document.getElementById('hold-B-bar').style.width = progress + '%';
+                    }
+
+                    if (holdTime >= 1500 && isPredicting) {
+                        triggerAnswer(currentDominantClass === 0 ? 'A' : 'B');
+                        holdingClass = -1; 
+                    }
+                }
+            } else {
+                holdingClass = -1;
+                document.getElementById('option-A').classList.remove('highlight-option');
+                document.getElementById('option-B').classList.remove('highlight-option');
+                document.getElementById('hold-A-bar').style.width = '0%';
+                document.getElementById('hold-B-bar').style.width = '0%';
+            }
+
+            if (webcam.canvas && ctx) {
+                ctx.drawImage(webcam.canvas, 0, 0);
+                if (pose) {
+                    tmPose.drawKeypoints(pose.keypoints, 0.5, ctx);
+                    tmPose.drawSkeleton(pose.keypoints, 0.5, ctx);
+                }
+            }
+        }
+
+        // --- 處理作答 ---
+        function triggerAnswer(selectedOption) {
+            if (!isPredicting) return; 
+            isPredicting = false; 
+            
+            const timeTaken = ((Date.now() - questionStartTime) / 1000).toFixed(1);
+            const isCorrect = (selectedOption === correctOption);
+            
+            let studentAnsText = selectedOption === 'A' ? document.getElementById('ans-A-text').innerText : document.getElementById('ans-B-text').innerText;
+            records.push({
+                question: `${num1} + ${num2}`,
+                correctAns: correctAnswer,
+                studentAns: studentAnsText,
+                selectedOption: selectedOption,
+                result: isCorrect ? '正確' : '錯誤',
+                time: parseFloat(timeTaken),
+                motorStruggle: hasMotorStruggle
+            });
+
+            if (isCorrect) score++;
+            showFeedback(isCorrect);
+        }
+
+        // --- 顯示回饋 ---
+        function showFeedback(isCorrect) {
+            const feedbackScreen = document.getElementById('feedback-screen');
+            const feedbackIcon = document.getElementById('feedback-icon');
+            const feedbackText = document.getElementById('feedback-text');
+
+            if (isCorrect) {
+                feedbackIcon.innerText = '✅';
+                feedbackText.innerText = '好叻！';
+                feedbackText.classList.replace('text-red-500', 'text-green-400');
+            } else {
+                feedbackIcon.innerText = '❌';
+                feedbackText.innerText = '試多次！';
+                feedbackText.classList.replace('text-green-400', 'text-red-500');
+            }
+
+            feedbackScreen.classList.remove('hidden-screen');
+
+            setTimeout(() => {
+                feedbackScreen.classList.add('hidden-screen');
+                currentQuestion++;
+                if (currentQuestion <= totalQuestions) generateQuestion();
+                else endGame();
+            }, 3000);
+        }
+
+        // --- 結算與自動上傳 ---
+        async function endGame() {
+            document.getElementById('game-screen').classList.add('hidden-screen');
+            document.getElementById('end-screen').classList.remove('hidden-screen');
+            
+            if(webcam) { try { webcam.stop(); } catch(e) {} }
+
+            document.getElementById('final-score').innerText = `答對：${score} / ${totalQuestions} 題`;
+            
+            let comment = "繼續努力！";
+            if (score === 5) comment = "表現非常出色！🌟";
+            else if (score >= 3) comment = "做得好！👍";
+            
+            document.getElementById('final-comment').innerText = comment;
+
+            // 1. 等待 Gemini 分析完成
+            geminiAnalysisText = await analyzeWithGemini();
+            
+            // 2. 將包含 AI 分析的完整結果上傳至 Google Sheet
+            uploadToGoogleSheet(geminiAnalysisText);
+        }
+
+        // --- Gemini API 智能分析 ---
+        async function analyzeWithGemini() {
+            if (!geminiApiKey) {
+                const text = "未設定 Gemini API Key。答對題數：" + score + "/" + totalQuestions;
+                document.getElementById('ai-analysis').classList.remove('animate-pulse');
+                document.getElementById('ai-analysis').innerText = text;
+                return text;
+            }
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+
+            let detailsForAI = records.map((r, i) => 
+                `第${i+1}題: ${r.question}, 答${r.selectedOption==='A'?'左':'右'}(${r.result}), 耗時${r.time}秒, 肢體困難:${r.motorStruggle?'有':'無'}`
+            ).join("\n");
+
+            const prompt = `你是一位香港的特殊教育專家。以下是一名嚴重智障初中生（代號：${studentID}）剛完成的「動作感測數學加法」練習數據：
+總分：${score}/${totalQuestions}
+作答明細：\n${detailsForAI}
+
+請撰寫一段繁體中文（香港用語）的綜合報告：
+【🎯 答題傾向即時分析】：綜合分析作答時間、正確率與肢體困難記錄。
+【💡 下一步教學建議】：給予老師具體且可行的特教教學建議。`;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal,
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                clearTimeout(timeoutId);
+                const result = await response.json();
+                const aiText = result.candidates[0].content.parts[0].text;
+                
+                const displayElement = document.getElementById('ai-analysis');
+                displayElement.classList.remove('animate-pulse');
+                displayElement.innerHTML = aiText.replace(/\n/g, '<br>');
+                
+                return aiText;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                const fallbackText = "系統分析：該生答對了 " + score + " 題。詳細傾向分析請見下載的成績表。";
+                document.getElementById('ai-analysis').classList.remove('animate-pulse');
+                document.getElementById('ai-analysis').innerText = "⚠️ AI 連線無法回應，可點擊上方「複製 Gemini Prompt」按鈕進行線上分析。";
+                return fallbackText;
+            }
+        }
+
+        function copyGeminiPrompt() {
+            let detailsForAI = records.map((r, i) => 
+                `第${i+1}題: ${r.question}, 答${r.selectedOption==='A'?'左':'右'}(${r.result}), 耗時${r.time}秒, 肢體困難:${r.motorStruggle?'有':'無'}`
+            ).join("\n");
+
+            const promptText = `你是一位香港的特殊教育專家。以下是一名嚴重智障初中生（代號：${studentID}）剛完成的「動作感測數學加法」練習數據：
+總分：${score}/${totalQuestions}
+作答明細：
+${detailsForAI}
+
+請撰寫一段繁體中文（香港慣用語）的綜合報告：
+【🎯 答題傾向即時分析】：綜合分析作答時間、正確率與肢體困難記錄，精準判斷學生目前的答題傾向。
+【💡 下一步教學建議】：針對上述分析的傾向，給予老師具體且可行的特教教學建議。`;
+
+            navigator.clipboard.writeText(promptText).then(() => {
+                alert("✅ Prompt 已成功複製！您可以直接貼上到網頁版 Gemini。");
+            }).catch(() => {
+                const textArea = document.createElement("textarea");
+                textArea.value = promptText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert("✅ Prompt 已複製到剪貼簿！");
+            });
+        }
+
+        async function uploadToGoogleSheet(aiAnalysis) {
+            if (!webhookUrl) return; 
+            
+            let detailsString = records.map((r, i) => 
+                `Q${i+1}: ${r.question}=${r.studentAns} (${r.result}, ${r.time}s, 肢體困難:${r.motorStruggle ? '有' : '無'})`
+            ).join("\n");
+
+            const payload = {
+                studentID: studentID,
+                timestamp: new Date().toLocaleString('zh-HK'),
+                score: `${score}/${totalQuestions}`,
+                aiAnalysis: aiAnalysis,     
+                details: detailsString      
+            };
+
+            try {
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                document.getElementById('upload-status').classList.remove('hidden');
+            } catch (error) {
+                document.getElementById('upload-status').innerText = '⚠️ 自動上傳失敗，請稍後下載成績表';
+                document.getElementById('upload-status').classList.remove('hidden', 'text-green-600', 'bg-green-100');
+                document.getElementById('upload-status').classList.add('text-red-600', 'bg-red-100');
+            }
+        }
+
+        // --- 查看歷史進步報告 ---
+        async function showProgressReport() {
+            document.getElementById('progress-student-id').innerText = "";
+            document.getElementById('progress-modal').classList.remove('hidden-screen');
+
+            if (!webhookUrl) {
+                document.getElementById('progress-content').innerHTML = `
+                    <div class="text-red-500 font-bold text-center mt-10 text-3xl">
+                        ⚠️ 尚未設定 Google Sheet 網址<br><br>
+                        <span class="text-2xl text-gray-600">請先點擊右上角的「⚙️」按鈕完成設定！</span>
+                    </div>`;
+                return;
+            }
+
+            document.getElementById('progress-content').innerHTML = '<div class="animate-pulse text-purple-600 font-bold text-center mt-10">正在連線 Google Sheet 讀取學生名單...</div>';
+
+            try {
+                const response = await fetch(webhookUrl, { method: 'GET', redirect: 'follow' });
+                fetchedHistoryData = await response.json();
+                
+                const uniqueIds = [...new Set(fetchedHistoryData
+                    .map(row => String(row[1]))
+                    .filter(id => id.length >= 1)
+                )];
+                
+                if (uniqueIds.length === 0) {
+                    document.getElementById('progress-content').innerHTML = '<div class="text-center font-bold">目前雲端沒有任何學生的紀錄。</div>';
+                    return;
+                }
+
+                let selectionHTML = '<h3 class="text-3xl font-bold text-center mb-8">請選擇要查看的學生：</h3><div class="flex flex-wrap justify-center gap-6">';
+                uniqueIds.forEach(id => {
+                    selectionHTML += `<button onclick="generateReportForStudent('${id}')" class="bg-blue-100 hover:bg-blue-200 border-4 border-blue-300 text-blue-800 font-bold py-4 px-10 rounded-2xl text-4xl shadow-md transition-transform transform hover:scale-105">${id}</button>`;
+                });
+                selectionHTML += '</div>';
+                
+                document.getElementById('progress-content').innerHTML = selectionHTML;
+                
+            } catch (error) {
+                document.getElementById('progress-content').innerHTML = '<span class="text-red-500 font-bold">讀取失敗！請確定 Google Sheet Web App 權限開啓。</span>';
+            }
+        }
+
+        // --- 為指定的學生產生報告 ---
+        async function generateReportForStudent(selectedID) {
+            document.getElementById('progress-student-id').innerText = ` - 代號 ${selectedID}`;
+            document.getElementById('progress-content').innerHTML = '<div class="animate-pulse text-purple-600 font-bold text-center mt-10">正在進行長期趨勢分析...</div>';
+            
+            const history = fetchedHistoryData.filter(row => String(row[1]) === String(selectedID));
+            const historyText = history.map((row, i) => `測驗${i+1} (${row[0]}): 分數 ${row[2]}`).join("\n\n");
+            
+            if (!geminiApiKey) {
+                document.getElementById('progress-content').innerHTML = `
+                    <div class="mb-6">
+                        <button onclick="showProgressReport()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg text-2xl shadow">⬅️ 返回學生名單</button>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl border-2 border-purple-300">
+                        <h4 class="text-2xl font-bold text-gray-800 mb-4">歷史數據簡報：</h4>
+                        <pre class="whitespace-pre-wrap font-sans text-xl text-gray-700 mb-4">${historyText}</pre>
+                        <p class="text-red-600 font-bold">（請於系統設定輸入 API Key 即可產生完整 AI 趨勢分析。）</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const prompt = `你是一位香港的特殊教育專家。以下是學生（代號：${selectedID}）過去多次的歷史紀錄：\n\n${historyText}\n\n請以繁體中文（香港用語）撰寫一份約 150-200 字的長期進步追蹤報告。`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+
+            try {
+                const aiRes = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                
+                const aiData = await aiRes.json();
+                const aiText = aiData.candidates[0].content.parts[0].text;
+                
+                document.getElementById('progress-content').innerHTML = `
+                    <div class="mb-6">
+                        <button onclick="showProgressReport()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg text-2xl shadow">⬅️ 返回學生名單</button>
+                    </div>
+                    <div>${aiText.replace(/\n/g, '<br>')}</div>
+                `;
+                
+            } catch (error) {
+                document.getElementById('progress-content').innerHTML = '<span class="text-red-500 font-bold">報告產生失敗，請確認 API Key 與網路。</span>';
+            }
+        }
+
+        function closeProgressReport() {
+            document.getElementById('progress-modal').classList.add('hidden-screen');
+        }
+
+        // --- 匯出 CSV ---
+        function downloadCSV() {
+            let csvContent = "\uFEFF"; 
+            csvContent += `學生代號：,${studentID}\n\n`;
+            csvContent += "題號,題目,正確答案,學生答案,結果,選擇位置,作答時間(秒),肢體維持困難\n";
+            
+            records.forEach((record, index) => {
+                let position = record.selectedOption === 'A' ? '左(動作1)' : '右(動作2)';
+                let struggle = record.motorStruggle ? '有' : '無';
+                let row = `${index + 1},${record.question},${record.correctAns},${record.studentAns},${record.result},${position},${record.time},${struggle}`;
+                csvContent += row + "\n";
+            });
+            
+            csvContent += `\n🤖 AI 專家綜合評估：\n"${geminiAnalysisText.replace(/"/g, '""')}"\n`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `數學加法成績_學生${studentID}_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
