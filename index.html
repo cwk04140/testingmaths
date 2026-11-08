@@ -361,10 +361,11 @@ ${historyText}
 1. 數字 (n1 與 n2) 必須在 1 到 5 之間（例如 1+1, 2+3）。
 2. 請以 JSON 陣列格式回傳 5 個物件：[{"n1": 1, "n2": 2}, ...]`;
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+            // 更新模型名稱為 gemini-2.5-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
 
             try {
                 const response = await fetch(apiUrl, {
@@ -378,16 +379,17 @@ ${historyText}
                 });
                 clearTimeout(timeoutId);
                 const result = await response.json();
-                const aiData = JSON.parse(result.candidates[0].content.parts[0].text);
-                
-                if (Array.isArray(aiData) && aiData.length >= 5) {
-                    aiQuestions = aiData.slice(0, 5).map(q => ({ 
-                        n1: Math.min(Math.max(q.n1, 1), 5),
-                        n2: Math.min(Math.max(q.n2, 1), 5)
-                    }));
-                } else {
-                    generateFallbackQuestions();
+                if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+                    const aiData = JSON.parse(result.candidates[0].content.parts[0].text);
+                    if (Array.isArray(aiData) && aiData.length >= 5) {
+                        aiQuestions = aiData.slice(0, 5).map(q => ({ 
+                            n1: Math.min(Math.max(q.n1, 1), 5),
+                            n2: Math.min(Math.max(q.n2, 1), 5)
+                        }));
+                        return;
+                    }
                 }
+                generateFallbackQuestions();
             } catch (error) {
                 clearTimeout(timeoutId);
                 generateFallbackQuestions();
@@ -584,7 +586,8 @@ ${historyText}
                 return text;
             }
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+            // 更新模型名稱為 gemini-2.5-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
             let detailsForAI = records.map((r, i) => 
                 `第${i+1}題: ${r.question}, 答${r.selectedOption==='A'?'左':'右'}(${r.result}), 耗時${r.time}秒, 肢體困難:${r.motorStruggle?'有':'無'}`
@@ -599,7 +602,7 @@ ${historyText}
 【💡 下一步教學建議】：給予老師具體且可行的特教教學建議。`;
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            const timeoutId = setTimeout(() => controller.abort(), 25000);
 
             try {
                 const response = await fetch(apiUrl, {
@@ -610,18 +613,25 @@ ${historyText}
                 });
                 clearTimeout(timeoutId);
                 const result = await response.json();
-                const aiText = result.candidates[0].content.parts[0].text;
                 
-                const displayElement = document.getElementById('ai-analysis');
-                displayElement.classList.remove('animate-pulse');
-                displayElement.innerHTML = aiText.replace(/\n/g, '<br>');
-                
-                return aiText;
+                if (result.error) {
+                    throw new Error(result.error.message || "API 錯誤");
+                }
+
+                if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+                    const aiText = result.candidates[0].content.parts[0].text;
+                    const displayElement = document.getElementById('ai-analysis');
+                    displayElement.classList.remove('animate-pulse');
+                    displayElement.innerHTML = aiText.replace(/\n/g, '<br>');
+                    return aiText;
+                } else {
+                    throw new Error("回應數據結構異常");
+                }
             } catch (error) {
                 clearTimeout(timeoutId);
                 const fallbackText = "系統分析：該生答對了 " + score + " 題。詳細傾向分析請見下載的成績表。";
                 document.getElementById('ai-analysis').classList.remove('animate-pulse');
-                document.getElementById('ai-analysis').innerText = "⚠️ AI 連線無法回應，可點擊上方「複製 Gemini Prompt」按鈕進行線上分析。";
+                document.getElementById('ai-analysis').innerText = `⚠️ 連線問題 (${error.message})，可點擊上方「複製 Gemini Prompt」按鈕進行線上分析。`;
                 return fallbackText;
             }
         }
@@ -749,27 +759,51 @@ ${detailsForAI}
             }
 
             const prompt = `你是一位香港的特殊教育專家。以下是學生（代號：${selectedID}）過去多次的歷史紀錄：\n\n${historyText}\n\n請以繁體中文（香港用語）撰寫一份約 150-200 字的長期進步追蹤報告。`;
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+            
+            // 更新模型名稱為 gemini-2.5-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
 
             try {
                 const aiRes = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal,
                     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                 });
-                
+                clearTimeout(timeoutId);
                 const aiData = await aiRes.json();
-                const aiText = aiData.candidates[0].content.parts[0].text;
+
+                if (aiData.error) {
+                    throw new Error(aiData.error.message || "API 金鑰或伺服器錯誤");
+                }
+
+                if (aiData.candidates && aiData.candidates[0] && aiData.candidates[0].content) {
+                    const aiText = aiData.candidates[0].content.parts[0].text;
+                    document.getElementById('progress-content').innerHTML = `
+                        <div class="mb-6">
+                            <button onclick="showProgressReport()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg text-2xl shadow">⬅️ 返回學生名單</button>
+                        </div>
+                        <div>${aiText.replace(/\n/g, '<br>')}</div>
+                    `;
+                } else {
+                    throw new Error("無法解析 AI 回應內容");
+                }
                 
+            } catch (error) {
+                clearTimeout(timeoutId);
                 document.getElementById('progress-content').innerHTML = `
                     <div class="mb-6">
                         <button onclick="showProgressReport()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg text-2xl shadow">⬅️ 返回學生名單</button>
                     </div>
-                    <div>${aiText.replace(/\n/g, '<br>')}</div>
+                    <div class="bg-red-50 p-6 rounded-xl border-2 border-red-300">
+                        <p class="text-red-600 font-bold text-2xl mb-4">⚠️ 報告產生失敗</p>
+                        <p class="text-gray-700 text-xl mb-2"><strong>錯誤原因：</strong> ${error.message}</p>
+                        <p class="text-gray-500 text-lg">提示：若提示 User location is not supported，請確認連線 VPN（台灣/日本/美國）。若提示 Key not valid，請於右上角設定更換有效的 Gemini API Key。</p>
+                    </div>
                 `;
-                
-            } catch (error) {
-                document.getElementById('progress-content').innerHTML = '<span class="text-red-500 font-bold">報告產生失敗，請確認 API Key 與網路。</span>';
             }
         }
 
