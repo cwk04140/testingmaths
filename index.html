@@ -361,8 +361,8 @@ ${historyText}
 1. 數字 (n1 與 n2) 必須在 1 到 5 之間（例如 1+1, 2+3）。
 2. 請以 JSON 陣列格式回傳 5 個物件：[{"n1": 1, "n2": 2}, ...]`;
 
-            // 更新模型名稱為 gemini-2.5-flash
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+            // 更新模型名稱為 gemini-3.8-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 20000);
@@ -586,8 +586,8 @@ ${historyText}
                 return text;
             }
 
-            // 更新模型名稱為 gemini-2.5-flash
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+            // 更新模型名稱為 gemini-3.8-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`;
 
             let detailsForAI = records.map((r, i) => 
                 `第${i+1}題: ${r.question}, 答${r.selectedOption==='A'?'左':'右'}(${r.result}), 耗時${r.time}秒, 肢體困難:${r.motorStruggle?'有':'無'}`
@@ -760,8 +760,8 @@ ${detailsForAI}
 
             const prompt = `你是一位香港的特殊教育專家。以下是學生（代號：${selectedID}）過去多次的歷史紀錄：\n\n${historyText}\n\n請以繁體中文（香港用語）撰寫一份約 150-200 字的長期進步追蹤報告。`;
             
-            // 更新模型名稱為 gemini-2.5-flash
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+            // 更新模型名稱為 gemini-3.8-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
